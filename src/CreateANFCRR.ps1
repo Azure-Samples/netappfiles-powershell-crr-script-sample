@@ -100,12 +100,15 @@ param
     [ValidateRange(107374182400,109951162777600)]
     [long]$NetAppVolumeSize = 107374182400,
          
-    #UnixReadOnly property
+    #Allowed Ip Addresses property
     [string]$AllowedClientsIp = "0.0.0.0/0",
 
     #Clean Up resources
     [bool]$CleanupResources = $False
 )
+
+$ErrorActionPreference="Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 #Functions
 Function WaitForANFResource
@@ -223,8 +226,6 @@ Param
     }
 }
 
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 
 # Authorizing and connecting to Azure
 Write-Verbose -Message "Authorizing with Azure Account..." -Verbose
@@ -234,8 +235,8 @@ Add-AzAccount
 Write-Verbose -Message "Creating Azure NetApp Files Primary Account" -Verbose
 $NewPrimaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourceGroupName `
     -Location $PrimaryLocation `
-    -Name $PrimaryNetAppAccountName `
-    -ErrorAction Stop
+    -Name $PrimaryNetAppAccountName
+
 Write-Verbose -Message "Azure NetApp Files Primary Account has been created successfully: $($NewPrimaryAccount.Id)" -Verbose
 
 
@@ -246,8 +247,8 @@ $NewPrimaryPool = New-AzNetAppFilesPool -ResourceGroupName $PrimaryResourceGroup
     -AccountName $PrimaryNetAppAccountName `
     -Name $PrimaryNetAppPoolName `
     -PoolSize $NetAppPoolSize `
-    -ServiceLevel $PrimaryServiceLevel `
-    -ErrorAction Stop
+    -ServiceLevel $PrimaryServiceLevel
+
 Write-Verbose -Message "Azure NetApp Files Primary Capacity Pool has been created successfully: $($NewPrimaryPool.Id)" -Verbose
 
 
@@ -276,8 +277,7 @@ $NewPrimaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $PrimaryResourceG
     -ServiceLevel $PrimaryServiceLevel `
     -SubnetId $PrimarySubnetId `
     -CreationToken $PrimaryNetAppVolumeName `
-    -ExportPolicy $ExportPolicy `
-    -ErrorAction Stop
+    -ExportPolicy $ExportPolicy
 
 Write-Verbose -Message "Azure NetApp Files Primary Volume has been created successfully: $($NewPrimaryVolume.Id)" -Verbose
 
@@ -285,8 +285,8 @@ Write-Verbose -Message "Azure NetApp Files Primary Volume has been created succe
 Write-Verbose -Message "Creating Azure NetApp Files Secondary Account" -Verbose
 $NewSecondaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $SecondaryResourceGroupName `
     -Location $SecondaryLocation `
-    -Name $SecondaryNetAppAccountName `
-    -ErrorAction Stop
+    -Name $SecondaryNetAppAccountName 
+
 Write-Verbose -Message "Azure NetApp Files Secondary Account has been created successfully: $($NewSecondaryAccount.Id)" -Verbose
 
 # Create Azure NetApp Files Secondary Capacity Pool
@@ -296,8 +296,8 @@ $NewSecondaryPool = New-AzNetAppFilesPool -ResourceGroupName $SecondaryResourceG
     -AccountName $SecondaryNetAppAccountName `
     -Name $SecondaryNetAppPoolName `
     -PoolSize $NetAppPoolSize `
-    -ServiceLevel $SecondaryServiceLevel `
-    -ErrorAction Stop
+    -ServiceLevel $SecondaryServiceLevel
+
 Write-Verbose -Message "Azure NetApp Files Secondary Capacity Pool has been created successfully: $($NewSecondaryPool.Id)" -Verbose
 
 #Create Azure NetApp Files NFS Volume
@@ -316,12 +316,11 @@ $NewSecondaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $SecondaryResou
     -SubnetId $SecondarySubnetId `
     -CreationToken $SecondaryNetAppVolumeName `
     -ExportPolicy $ExportPolicy `
-    -ReplicationObject $DataReplication `
-    -ErrorAction Stop
+    -ReplicationObject $DataReplication
 
 WaitForANFResource -ResourceType Volume -ResourceId $NewSecondaryVolume.Id -CheckForReplication $True
 
-Write-Verbose -Message "Azure NetApp Files Primary Volume has been created successfully: $($NewSecondaryVolume.Id)" -Verbose
+Write-Verbose -Message "Azure NetApp Files Secondary Volume has been created successfully: $($NewSecondaryVolume.Id)" -Verbose
 
 #Authorize the Primary volume
 Write-Verbose -Message "Authorizing replication in source region ..." -Verbose
@@ -329,8 +328,7 @@ Approve-AzNetAppFilesReplication -ResourceGroupName $PrimaryResourceGroupName `
     -AccountName $PrimaryNetAppAccountName `
     -PoolName $PrimaryNetAppPoolName `
     -Name $PrimaryNetAppVolumeName `
-    -DataProtectionVolumeId $($NewSecondaryVolume.Id) `
-    -ErrorAction Stop
+    -DataProtectionVolumeId $($NewSecondaryVolume.Id)
 
 if($CleanupResources)
 {
@@ -342,30 +340,30 @@ if($CleanupResources)
     #-------------------------------------
 
     Write-Verbose -Message "Deleting Replication in Secondary volume" -Verbose
-    Remove-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName -ErrorAction Stop
+    Remove-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName
 
-    WaitForNoANFResource -ResourceType Volume -ResourceId $NewSecondaryVolume.Id -CheckForReplication $True
+    WaitForNoANFResource -ResourceType Volume -ResourceId $($NewSecondaryVolume.Id) -CheckForReplication $True
 
     #Deleting NetApp Files Volume 
     Write-Verbose -Message "Deleting Azure NetApp Files Volume: $SecondaryNetAppVolumeName" -Verbose
     Remove-AzNetAppFilesVolume -ResourceGroupName $SecondaryResourceGroupName `
             -AccountName $SecondaryNetAppAccountName `
             -PoolName $SecondaryNetAppPoolName `
-            -Name $SecondaryNetAppVolumeName `
-            -ErrorAction Stop
+            -Name $SecondaryNetAppVolumeName
+
+    WaitForNoANFResource -ResourceType Volume -ResourceId $($NewSecondaryVolume.Id)
 
     #Deleting NetApp Files Pool
     Write-Verbose -Message "Deleting Azure NetApp Files pool: $SecondaryNetAppPoolName" -Verbose
     Remove-AzNetAppFilesPool -ResourceGroupName $SecondaryResourceGroupName `
         -AccountName $SecondaryNetAppAccountName `
-        -PoolName $SecondaryNetAppPoolName `
-        -ErrorAction Stop
+        -PoolName $SecondaryNetAppPoolName
 
     WaitForNoANFResource -ResourceType CapacityPool -ResourceId $($NewSecondaryPool.Id)
 
     #Deleting NetApp Files account
     Write-Verbose -Message "Deleting Azure NetApp Files Account: $SecondaryNetAppAccountName" -Verbose
-    Remove-AzNetAppFilesAccount -ResourceGroupName $SecondaryResourceGroupName -Name $SecondaryNetAppAccountName -ErrorAction Stop
+    Remove-AzNetAppFilesAccount -ResourceGroupName $SecondaryResourceGroupName -Name $SecondaryNetAppAccountName
 
 
     #-------------------------------------
@@ -377,21 +375,21 @@ if($CleanupResources)
     Remove-AzNetAppFilesVolume -ResourceGroupName $PrimaryResourceGroupName `
             -AccountName $PrimaryNetAppAccountName `
             -PoolName $PrimaryNetAppPoolName `
-            -Name $PrimaryNetAppVolumeName `
-            -ErrorAction Stop
+            -Name $PrimaryNetAppVolumeName
+
+    WaitForNoANFResource -ResourceType Volume -ResourceId $($NewPrimaryVolume.Id)
 
     #Deleting NetApp Files Pool
     Write-Verbose -Message "Deleting Azure NetApp Files pool: $PrimaryNetAppPoolName" -Verbose
     Remove-AzNetAppFilesPool -ResourceGroupName $PrimaryResourceGroupName `
         -AccountName $PrimaryNetAppAccountName `
-        -PoolName $PrimaryNetAppPoolName `
-        -ErrorAction Stop
+        -PoolName $PrimaryNetAppPoolName
 
     WaitForNoANFResource -ResourceType CapacityPool -ResourceId $($NewPrimaryPool.Id)
 
     #Deleting NetApp Files account
     Write-Verbose -Message "Deleting Azure NetApp Files Account: $PrimaryNetAppAccountName" -Verbose
-    Remove-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourceGroupName -Name $PrimaryNetAppAccountName -ErrorAction Stop
+    Remove-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourceGroupName -Name $PrimaryNetAppAccountName
 
     Write-Verbose -Message "All Azure NetApp Files resources have been deleted successfully." -Verbose    
 }
