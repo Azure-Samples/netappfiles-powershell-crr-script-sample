@@ -115,17 +115,18 @@ Function WaitForANFResource
 {
     Param 
     (
-        [ValidateSet("NetAppAccount","CapacityPool","Volume","Snapshot")]
+        [ValidateSet("NetAppAccount","CapacityPool","Volume","Snapshot","Replication")]
         [string]$ResourceType,
         [string]$ResourceId, 
         [int]$IntervalInSec = 10,
         [int]$retries = 60,
+        #Set to 'true' to Check for replication Status when creting Data protection volume
         [bool]$CheckForReplication = $False
     )
 
     for($i = 0; $i -le $retries; $i++)
     {
-        Write-Verbose -Message "$(Get-Date -DisplayHint Time): Checking provision state" -Verbose
+        Write-Verbose -Message "$Checking provision state" -Verbose
         Start-Sleep -s $IntervalInSec
         try
         {
@@ -191,7 +192,7 @@ Param
 
     for($i = 0; $i -le $retries; $i++)
     {
-        Write-Verbose -Message "$(Get-Date -DisplayHint Time): Checking if resource has been completly deleted" -Verbose
+        Write-Verbose -Message "Checking if resource has been completly deleted" -Verbose
         Start-Sleep -s $IntervalInSec
         try
         {
@@ -301,7 +302,7 @@ $NewSecondaryPool = New-AzNetAppFilesPool -ResourceGroupName $SecondaryResourceG
 Write-Verbose -Message "Azure NetApp Files Secondary Capacity Pool has been created successfully: $($NewSecondaryPool.Id)" -Verbose
 
 #Create Azure NetApp Files NFS Volume
-Write-Verbose -Message "$(Get-Date -DisplayHint Time) Creating Azure NetApp Files Data Replication Volume at the Secondary account" -Verbose
+Write-Verbose -Message "Creating Azure NetApp Files Data Replication Volume at the Secondary account" -Verbose
 
 $DataReplication = New-Object -TypeName Microsoft.Azure.Commands.NetAppFiles.Models.PSNetAppFilesReplicationObject -Property @{EndpointType = "dst";RemoteVolumeRegion = $PrimaryLocation;RemoteVolumeResourceId = $NewPrimaryVolume.Id;ReplicationSchedule = "hourly"}
 
@@ -329,6 +330,7 @@ Approve-AzNetAppFilesReplication -ResourceGroupName $PrimaryResourceGroupName `
     -PoolName $PrimaryNetAppPoolName `
     -Name $PrimaryNetAppVolumeName `
     -DataProtectionVolumeId $($NewSecondaryVolume.Id)
+Write-Verbose -Message "Sucessfully authorized replication in source region ..." -Verbose
 
 if($CleanupResources)
 {
