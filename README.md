@@ -21,7 +21,7 @@ In this sample application we perform the following operations:
 		
  * Secondary ANF Account
 	| Secondary Capacity pool
-		| Secondary NFS v.1 Data Replication Volume with referencing to the primary volume Resource ID
+		| Secondary NFS v.1 Data Replication Volume with referencing to the previously created primary volume Resource ID
 			
  * Authorize Source volume with Desitnation Volume Resource ID
  
