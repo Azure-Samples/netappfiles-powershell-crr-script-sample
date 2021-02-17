@@ -25,7 +25,7 @@ In this sample application we perform the following operations:
 			
  * Authorize Source volume with Desitnation Volume Resource ID
  
- * Finally, the clean up process takes place (not enabled by default, change the variable shouldCleanUp to true at CreateANFCRR.ps1 file if you want the clean up code to take a place),deleting all resources in the reverse order following the hierarchy otherwise we can't remove resources that have nested resources still live. You will also notice that the clean up process uses a function called WaitForNoANFResource, at this moment this is required so we can workaround a current ARM behavior of reporting that the object was deleted when in fact its deletion is still in progress.
+ * Finally, the clean up process takes place (not enabled by default, change the variable CleanupResources to true at CreateANFCRR.ps1 file if you want the clean up code to take a place),deleting all resources in the reverse order following the hierarchy otherwise we can't remove resources that have nested resources still live. You will also notice that the clean up process uses a function called WaitForNoANFResource, at this moment this is required so we can workaround a current ARM behavior of reporting that the object was deleted when in fact its deletion is still in progress.
  
 
 If you don't already have a Microsoft Azure subscription, you can get a FREE trial account [here](http://go.microsoft.com/fwlink/?LinkId=330212).
@@ -75,7 +75,7 @@ The following table describes all files within this solution:
 |-------------|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | Root        | CreateANFCRR.ps1        | Authenticates and executes all operations                                                                                           |
 
-# How to run the console application
+# How to run the script sample application
 
 1. Clone it locally
     ```powershell
