@@ -48,7 +48,7 @@
 #>
 param
 (
-    # Name of the Azure Primary Resource Group
+    #Name of the Azure Primary Resource Group
     [string]$PrimaryResourceGroupName = 'PrimaryResources-rg',
 
     #Azure Primary location 
@@ -63,14 +63,14 @@ param
     #Azure NetApp Files Primary volume name
     [string]$PrimaryNetAppVolumeName = 'vol1',
 
-    # Primary ANF Service Level can be {Ultra, Premium or Standard}
+    #Primary ANF Service Level can be {Ultra, Premium or Standard}
     [ValidateSet("Ultra","Premium","Standard")]
     [string]$PrimaryServiceLevel = 'Premium',
 
     #Primary Subnet Id 
     [string]$PrimarySubnetId = '[Subnet ID in Primary region]',
 
-    # Name of the Azure Secondary Resource Group
+    #Name of the Azure Secondary Resource Group
     [string]$SecondaryResourceGroupName = 'SecondaryResources-rg',
 
     #Azure Secondary location 
@@ -85,7 +85,7 @@ param
     #Azure NetApp Files Secondary volume name
     [string]$SecondaryNetAppVolumeName = 'vol2',
 
-    # Secondary ANF Service Level can be {Ultra, Premium or Standard}
+    #Secondary ANF Service Level can be {Ultra, Premium or Standard}
     [ValidateSet("Ultra","Premium","Standard")]
     [string]$SecondaryServiceLevel = 'Standard',
 
@@ -228,11 +228,11 @@ Param
 }
 
 
-# Authorizing and connecting to Azure
+#Authorizing and connecting to Azure
 Write-Verbose -Message "Authorizing with Azure Account..." -Verbose
 Add-AzAccount
 
-# Create Azure NetApp Files Primary Account
+#Create Azure NetApp Files Primary Account
 Write-Verbose -Message "Creating Azure NetApp Files Primary Account" -Verbose
 $NewPrimaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourceGroupName `
     -Location $PrimaryLocation `
@@ -241,7 +241,7 @@ $NewPrimaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourc
 Write-Verbose -Message "Azure NetApp Files Primary Account has been created successfully: $($NewPrimaryAccount.Id)" -Verbose
 
 
-# Create Azure NetApp Files Primary Capacity Pool
+#Create Azure NetApp Files Primary Capacity Pool
 Write-Verbose -Message "Creating Azure NetApp Files Primary Capacity Pool" -Verbose
 $NewPrimaryPool = New-AzNetAppFilesPool -ResourceGroupName $PrimaryResourceGroupName `
     -Location $PrimaryLocation `
@@ -282,7 +282,7 @@ $NewPrimaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $PrimaryResourceG
 
 Write-Verbose -Message "Azure NetApp Files Primary Volume has been created successfully: $($NewPrimaryVolume.Id)" -Verbose
 
-# Create Azure NetApp Files Secondary Account
+#Create Azure NetApp Files Secondary Account
 Write-Verbose -Message "Creating Azure NetApp Files Secondary Account" -Verbose
 $NewSecondaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $SecondaryResourceGroupName `
     -Location $SecondaryLocation `
@@ -290,7 +290,7 @@ $NewSecondaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $SecondaryRes
 
 Write-Verbose -Message "Azure NetApp Files Secondary Account has been created successfully: $($NewSecondaryAccount.Id)" -Verbose
 
-# Create Azure NetApp Files Secondary Capacity Pool
+#Create Azure NetApp Files Secondary Capacity Pool
 Write-Verbose -Message "Creating Azure NetApp Files Secondary Capacity Pool" -Verbose
 $NewSecondaryPool = New-AzNetAppFilesPool -ResourceGroupName $SecondaryResourceGroupName `
     -Location $SecondaryLocation `
@@ -317,7 +317,8 @@ $NewSecondaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $SecondaryResou
     -SubnetId $SecondarySubnetId `
     -CreationToken $SecondaryNetAppVolumeName `
     -ExportPolicy $ExportPolicy `
-    -ReplicationObject $DataReplication
+    -ReplicationObject $DataReplication `
+    -VolumeType "DataProtection"
 
 WaitForANFResource -ResourceType Volume -ResourceId $NewSecondaryVolume.Id -CheckForReplication $True
 
