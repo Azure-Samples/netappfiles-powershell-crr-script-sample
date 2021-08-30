@@ -227,6 +227,42 @@ Param
     }
 }
 
+Function WaitForMirroredReplicationStatus
+{
+    Param 
+    (
+        [string]$ResourceGroup,
+        [string]$AccountName, 
+        [string]$PoolName, 
+        [string]$VolumeName, 
+        [int]$IntervalInSec = 10,
+        [int]$retries = 60        
+    )
+
+    Write-Verbose -Message "Waiting for Mirrored Replication status..." -Verbose
+    for($i = 0; $i -le $retries; $i++)
+    {
+        Start-Sleep -s $IntervalInSec
+        try
+        {
+            $ReplicationStatus = Get-AzNetAppFilesReplicationStatus -ResourceGroupName $ResourceGroup -AccountName $AccountName -PoolName $PoolName -Name $VolumeName
+            if($ReplicationStatus.MirrorState -eq "Mirrored")
+            {
+                break
+            }    
+        }
+        catch
+        {
+            throw "Error retrieving replication status"
+        }
+    }
+
+    #In case it exists the loop with Mirror status not equal to mirrored
+    if($ReplicationStatus.MirrorState -ne "Mirrored")
+    {
+        throw "Replication was not completed properly!"
+    }
+}
 
 #Authorizing and connecting to Azure
 Write-Verbose -Message "Authorizing with Azure Account..." -Verbose
@@ -339,8 +375,10 @@ if($CleanupResources)
     Write-Verbose -Message "Cleaning up Azure NetApp Files resources..." -Verbose
     
     #-------------------------------------
-    #Cleaning up secondary resources
+    #Cleaning up secondary resources First
     #-------------------------------------
+    Write-Verbose -Message "Break the replication connection on the destination volume" -Verbose
+    Suspend-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName
 
     Write-Verbose -Message "Deleting Replication in Secondary volume" -Verbose
     Remove-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName
