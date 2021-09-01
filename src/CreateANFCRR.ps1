@@ -48,7 +48,7 @@
 #>
 param
 (
-    # Name of the Azure Primary Resource Group
+    #Name of the Azure Primary Resource Group
     [string]$PrimaryResourceGroupName = 'PrimaryResources-rg',
 
     #Azure Primary location 
@@ -63,14 +63,14 @@ param
     #Azure NetApp Files Primary volume name
     [string]$PrimaryNetAppVolumeName = 'vol1',
 
-    # Primary ANF Service Level can be {Ultra, Premium or Standard}
+    #Primary ANF Service Level can be {Ultra, Premium or Standard}
     [ValidateSet("Ultra","Premium","Standard")]
     [string]$PrimaryServiceLevel = 'Premium',
 
     #Primary Subnet Id 
     [string]$PrimarySubnetId = '[Subnet ID in Primary region]',
 
-    # Name of the Azure Secondary Resource Group
+    #Name of the Azure Secondary Resource Group
     [string]$SecondaryResourceGroupName = 'SecondaryResources-rg',
 
     #Azure Secondary location 
@@ -85,7 +85,7 @@ param
     #Azure NetApp Files Secondary volume name
     [string]$SecondaryNetAppVolumeName = 'vol2',
 
-    # Secondary ANF Service Level can be {Ultra, Premium or Standard}
+    #Secondary ANF Service Level can be {Ultra, Premium or Standard}
     [ValidateSet("Ultra","Premium","Standard")]
     [string]$SecondaryServiceLevel = 'Standard',
 
@@ -227,12 +227,48 @@ Param
     }
 }
 
+Function WaitForMirroredReplicationStatus
+{
+    Param 
+    (
+        [string]$ResourceGroup,
+        [string]$AccountName, 
+        [string]$PoolName, 
+        [string]$VolumeName, 
+        [int]$IntervalInSec = 10,
+        [int]$retries = 60        
+    )
 
-# Authorizing and connecting to Azure
+    Write-Verbose -Message "Waiting for Mirrored Replication status..." -Verbose
+    for($i = 0; $i -le $retries; $i++)
+    {
+        Start-Sleep -s $IntervalInSec
+        try
+        {
+            $ReplicationStatus = Get-AzNetAppFilesReplicationStatus -ResourceGroupName $ResourceGroup -AccountName $AccountName -PoolName $PoolName -Name $VolumeName
+            if($ReplicationStatus.MirrorState -eq "Mirrored")
+            {
+                break
+            }    
+        }
+        catch
+        {
+            throw "Error retrieving replication status"
+        }
+    }
+
+    #In case it exists the loop with Mirror status not equal to mirrored
+    if($ReplicationStatus.MirrorState -ne "Mirrored")
+    {
+        throw "Replication was not completed properly!"
+    }
+}
+
+#Authorizing and connecting to Azure
 Write-Verbose -Message "Authorizing with Azure Account..." -Verbose
 Add-AzAccount
 
-# Create Azure NetApp Files Primary Account
+#Create Azure NetApp Files Primary Account
 Write-Verbose -Message "Creating Azure NetApp Files Primary Account" -Verbose
 $NewPrimaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourceGroupName `
     -Location $PrimaryLocation `
@@ -241,7 +277,7 @@ $NewPrimaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $PrimaryResourc
 Write-Verbose -Message "Azure NetApp Files Primary Account has been created successfully: $($NewPrimaryAccount.Id)" -Verbose
 
 
-# Create Azure NetApp Files Primary Capacity Pool
+#Create Azure NetApp Files Primary Capacity Pool
 Write-Verbose -Message "Creating Azure NetApp Files Primary Capacity Pool" -Verbose
 $NewPrimaryPool = New-AzNetAppFilesPool -ResourceGroupName $PrimaryResourceGroupName `
     -Location $PrimaryLocation `
@@ -282,7 +318,7 @@ $NewPrimaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $PrimaryResourceG
 
 Write-Verbose -Message "Azure NetApp Files Primary Volume has been created successfully: $($NewPrimaryVolume.Id)" -Verbose
 
-# Create Azure NetApp Files Secondary Account
+#Create Azure NetApp Files Secondary Account
 Write-Verbose -Message "Creating Azure NetApp Files Secondary Account" -Verbose
 $NewSecondaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $SecondaryResourceGroupName `
     -Location $SecondaryLocation `
@@ -290,7 +326,7 @@ $NewSecondaryAccount = New-AzNetAppFilesAccount -ResourceGroupName $SecondaryRes
 
 Write-Verbose -Message "Azure NetApp Files Secondary Account has been created successfully: $($NewSecondaryAccount.Id)" -Verbose
 
-# Create Azure NetApp Files Secondary Capacity Pool
+#Create Azure NetApp Files Secondary Capacity Pool
 Write-Verbose -Message "Creating Azure NetApp Files Secondary Capacity Pool" -Verbose
 $NewSecondaryPool = New-AzNetAppFilesPool -ResourceGroupName $SecondaryResourceGroupName `
     -Location $SecondaryLocation `
@@ -317,7 +353,8 @@ $NewSecondaryVolume = New-AzNetAppFilesVolume -ResourceGroupName $SecondaryResou
     -SubnetId $SecondarySubnetId `
     -CreationToken $SecondaryNetAppVolumeName `
     -ExportPolicy $ExportPolicy `
-    -ReplicationObject $DataReplication
+    -ReplicationObject $DataReplication `
+    -VolumeType "DataProtection"
 
 WaitForANFResource -ResourceType Volume -ResourceId $NewSecondaryVolume.Id -CheckForReplication $True
 
@@ -338,8 +375,10 @@ if($CleanupResources)
     Write-Verbose -Message "Cleaning up Azure NetApp Files resources..." -Verbose
     
     #-------------------------------------
-    #Cleaning up secondary resources
+    #Cleaning up secondary resources First
     #-------------------------------------
+    Write-Verbose -Message "Break the replication connection on the destination volume" -Verbose
+    Suspend-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName
 
     Write-Verbose -Message "Deleting Replication in Secondary volume" -Verbose
     Remove-AzNetAppFilesReplication -ResourceGroupName $SecondaryResourceGroupName -AccountName $SecondaryNetAppAccountName -PoolName $SecondaryNetAppPoolName -Name $SecondaryNetAppVolumeName
